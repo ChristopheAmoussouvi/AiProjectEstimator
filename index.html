@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Simulateur de cadrage projet IA — Refactorisé</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#121a33;
+      --panel-2:#0e1630;
+      --text:#e8eefc;
+      --muted:#9fb3ff;
+      --accent:#5b8cff;
+      --accent-2:#73ffd1;
+      --danger:#ff6b6b;
+      --ok:#18c29c;
+      --border:rgba(255,255,255,0.08);
+      --shadow:0 10px 30px rgba(0,0,0,0.35);
+      --radius:14px;
+      --radius-sm:10px;
+      --grid-gap:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,"Apple Color Emoji","Segoe UI Emoji";
+      background:
+        radial-gradient(1200px 800px at 20% -10%, #1a2b6a33 0%, transparent 60%),
+        radial-gradient(1000px 600px at 110% 20%, #0c8fa533 0%, transparent 60%),
+        linear-gradient(180deg, #070a17 0%, #0b1020 60%);
+      color:var(--text);
+      line-height:1.35;
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(8px);
+      background:linear-gradient(180deg, rgba(10,16,34,0.85) 0%, rgba(10,16,34,0.55) 100%);
+      border-bottom:1px solid var(--border);
+    }
+    .container{
+      max-width:1000px;
+      margin:0 auto;
+      padding:18px clamp(16px, 3vw, 28px);
+    }
+    .title{
+      display:flex; align-items:center; gap:14px;
+      font-weight:800; letter-spacing:0.2px;
+      font-size:20px;
+    }
+    .title .badge{
+      font-size:12px; letter-spacing:.4px;
+      color:#021;
+      background:linear-gradient(180deg, var(--accent-2), #48e0b7);
+      padding:4px 8px; border-radius:999px; font-weight:700;
+    }
+    .app{
+      max-width:1100px;
+      margin:24px auto 60px;
+      padding:0 clamp(16px, 3vw, 28px);
+      display:grid;
+      grid-template-columns:1.3fr 1fr;
+      gap:24px;
+    }
+    @media (max-width: 900px){
+      .app{grid-template-columns:1fr}
+    }
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)) , var(--panel);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .cardHeader{
+      padding:16px 16px 0 16px;
+    }
+    .cardBody{
+      padding:16px;
+    }
+    .sectionTitle{
+      font-weight:700;
+      color:var(--muted);
+      text-transform:uppercase;
+      font-size:12px;
+      letter-spacing:.12em;
+      margin-bottom:8px;
+    }
+    .row{
+      display:grid;
+      grid-template-columns:1fr auto;
+      align-items:center;
+      gap:14px;
+      padding:10px 0;
+      border-bottom:1px dashed var(--border);
+    }
+    .row:last-child{border-bottom:0}
+    .row .label{
+      display:flex; align-items:center; gap:10px; min-width:0;
+    }
+    .row .label .dot{
+      width:10px; height:10px; border-radius:50%;
+      background:linear-gradient(180deg, #7aa3ff, #3a66ff);
+      box-shadow:0 0 0 3px rgba(90,130,255,0.12);
+    }
+    .row .label .name{
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .input{
+      width:110px;
+      background:var(--panel-2);
+      border:1px solid var(--border);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:10px;
+      outline:none;
+      transition:border-color .2s, box-shadow .2s;
+      text-align:right;
+      font-variant-numeric: tabular-nums;
+    }
+    .input.small{width:90px}
+    .input:focus{
+      border-color:#5b88ff;
+      box-shadow:0 0 0 4px rgba(91,140,255,0.15);
+    }
+    .input[aria-invalid="true"]{
+      border-color:var(--danger);
+      box-shadow:0 0 0 4px rgba(255,107,107,0.12);
+    }
+    .hint{
+      color:#c2cffc;
+      opacity:.8;
+      font-size:12px;
+      margin-top:2px;
+    }
+    .toolbar{
+      display:flex; gap:10px; flex-wrap:wrap;
+      padding:0 16px 16px 16px;
+      border-bottom:1px solid var(--border);
+    }
+
+    /* Print styles for A4 PDF-like quote */
+    @media print {
+      @page { size: A4; margin: 14mm 14mm 16mm 14mm; }
+      body {
+        background: #ffffff !important;
+        color: #111 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      header, .toolbar, .notes, .footer, #phasesList, .sectionTitle:has(+ #phasesList) {
+        display: none !important;
+      }
+      .app {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: none !important;
+      }
+      .card {
+        background: #ffffff !important;
+        border: 1px solid #dcdcdc !important;
+        box-shadow: none !important;
+      }
+      .cardHeader, .cardBody { padding: 12px 12px !important; }
+      .sectionTitle { color: #333 !important; }
+      .metric .k { color: #111 !important; text-shadow: none !important; }
+      .table th, .table td { border-bottom: 1px solid #e6e6e6 !important; }
+      .pill {
+        background: #f5f5f5 !important;
+        border-color: #e6e6e6 !important;
+        color: #333 !important;
+      }
+      /* Quote header */
+      .quoteHeader {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: start;
+        margin-bottom: 8px;
+      }
+      .quoteBrand { font-weight: 800; font-size: 16px; }
+      .quoteMeta { text-align: right; font-size: 12px; color: #333; }
+    }
+    .btn{
+      background:linear-gradient(180deg, #2a3d7a, #1f2f61);
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:10px 12px;
+      font-weight:700;
+      letter-spacing:.2px;
+      cursor:pointer;
+      transition:transform .05s ease, filter .15s ease, background .2s ease;
+      user-select:none;
+    }
+    .btn:active{ transform:translateY(1px) }
+    .btn.ghost{
+      background:transparent;
+    }
+    .btn.accent{
+      background:linear-gradient(180deg, #6ea3ff, #3a66ff);
+      border-color:#3a66ff;
+      color:white;
+      box-shadow:0 8px 24px rgba(65,112,255,0.3);
+    }
+    .btn.danger{
+      background:linear-gradient(180deg, #ff8b8b, #ff5a5a);
+      border-color:#ff5a5a;
+      color:#210a0a;
+      box-shadow:0 8px 24px rgba(255,90,90,0.25);
+    }
+    .btn.small{ padding:8px 10px; font-size:13px }
+
+    .grid{
+      display:grid; gap:var(--grid-gap);
+    }
+    .grid.two{
+      grid-template-columns:1fr 1fr;
+    }
+    @media (max-width:600px){ .grid.two{grid-template-columns:1fr} }
+
+    .summary{
+      display:grid; gap:12px;
+    }
+    .metric{
+      background:linear-gradient(180deg, rgba(115,255,209,0.15), rgba(115,255,209,0.05));
+      border:1px solid rgba(115,255,209,0.35);
+      border-radius:12px; padding:12px;
+    }
+    .metric .k{
+      font-size:28px; font-weight:800; letter-spacing:0.2px;
+      color:white;
+      text-shadow:0 2px 18px rgba(115,255,209,0.3);
+    }
+    .metric .t{ color:#c2f9ea; font-size:12px }
+
+    .table{
+      width:100%; border-collapse:collapse; font-size:14px;
+    }
+    .table th, .table td{
+      padding:10px 8px; border-bottom:1px dashed var(--border);
+      text-align:right;
+    }
+    .table th:first-child, .table td:first-child{text-align:left}
+    .pill{
+      display:inline-block;
+      padding:3px 8px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.06);
+      border:1px solid var(--border);
+      font-size:12px; color:#c0cfff;
+    }
+
+    .footer{
+      opacity:.8; font-size:12px; text-align:center;
+      margin:26px 0 50px;
+    }
+
+    .legend{
+      display:flex; gap:8px; align-items:center; color:#c7d2ff; font-size:12px
+    }
+    .legend i{
+      width:10px; height:10px; border-radius:2px; display:inline-block;
+      background:linear-gradient(180deg, #6ea3ff, #3a66ff);
+      box-shadow:0 0 0 3px rgba(90,130,255,0.12);
+    }
+
+    .notes{
+      font-size:12px; color:#bcd; opacity:.9
+    }
+    .muted{ color:#a9b7ea; opacity:.9 }
+    a.inline{
+      color:#8eb2ff; text-decoration:none; border-bottom:1px dashed rgba(142,178,255,0.5)
+    }
+    a.inline:hover{ filter:brightness(1.1) }
+  </style>
+
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <script type="importmap">
+  {
+    "imports": {
+      "lit": "https://cdn.jsdelivr.net/npm/lit@3/+esm"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="title">
+        <svg width="26" height="26" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="g1" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#73FFD1"/><stop offset="1" stop-color="#3A66FF"/>
+            </linearGradient>
+          </defs>
+          <rect x="3" y="3" width="38" height="38" rx="11" fill="url(#g1)" opacity=".22"/>
+          <path d="M12 28c7-2 7-12 16-14 2 0 4 1 4 3 0 8-9 16-17 16-2 0-3-2-3-5z" fill="url(#g1)"/>
+        </svg>
+        <div>
+          <div>Simulateur de cadrage projet IA</div>
+          <div class="badge" aria-hidden="true">Refactor+</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app" id="app">
+    <section class="card" aria-label="Paramètres">
+      <div class="toolbar">
+        <button class="btn small ghost" id="addPhaseBtn">+ Ajouter une phase</button>
+        <button class="btn small ghost" id="presetLeanBtn">Preset: Lean</button>
+        <button class="btn small ghost" id="presetFullBtn">Preset: Complet</button>
+        <button class="btn small danger" id="resetBtn">Réinitialiser</button>
+        <button class="btn small accent" id="printBtn">Exporter PDF (Devis)</button>
+        <span class="legend" aria-hidden="true"><i></i> Jours / phase</span>
+      </div>
+      <div class="cardBody" id="phasesList"></div>
+      <div class="cardBody" style="border-top:1px solid var(--border)">
+        <div class="sectionTitle">TJM</div>
+        <div class="row">
+          <div class="label"><span class="dot"></span><span class="name">Taux journalier moyen (€)</span></div>
+          <div>
+            <input id="tjmInput" class="input" inputmode="decimal" aria-label="Taux journalier moyen" />
+            <div class="hint">HT, sans remises</div>
+          </div>
+        </div>
+        <div class="grid two" style="margin-top:14px">
+          <div class="notes">Astuce: utilisez les flèches du clavier sur les champs numériques pour ajuster rapidement.</div>
+          <div style="text-align:right">
+            <button class="btn accent" id="exportBtn">Exporter</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Résumé">
+      <div class="cardHeader">
+        <div class="sectionTitle">Résumé</div>
+        <!-- Print-only quote header -->
+        <div class="quoteHeader" style="display:none" id="quoteHeader">
+          <div class="quoteBrand">Devis — Simulateur projet IA</div>
+          <div class="quoteMeta">
+            <div id="quoteDate"></div>
+            <div id="quoteRef"></div>
+          </div>
+        </div>
+      </div>
+      <div class="cardBody">
+        <div class="summary">
+          <div class="metric">
+            <div class="k" id="totalDaysK">0 j</div>
+            <div class="t">Temps total</div>
+          </div>
+          <div class="metric" style="background:linear-gradient(180deg, rgba(106,137,255,0.16), rgba(106,137,255,0.06)); border-color: rgba(106,137,255,0.35)">
+            <div class="k" id="totalCostK">0 €</div>
+            <div class="t">Coût estimé (HT)</div>
+          </div>
+        </div>
+
+        <div style="height:14px"></div>
+
+        <table class="table" aria-label="Détail des phases">
+          <thead>
+            <tr>
+              <th>Phase</th>
+              <th>Jours</th>
+              <th>Coût</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+          <tfoot>
+            <tr>
+              <td><span class="pill">Total</span></td>
+              <td><span id="tfootDays">0</span></td>
+              <td><span id="tfootCost">0 €</span></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div style="height:14px"></div>
+
+        <div class="grid two">
+          <div>
+            <label class="sectionTitle" for="remiseInput">Remise (%)</label>
+            <input id="remiseInput" class="input small" inputmode="decimal" aria-label="Remise en pourcentage" />
+            <div class="hint">Appliquée au total HT</div>
+          </div>
+          <div>
+            <label class="sectionTitle" for="margeInput">Marge (%)</label>
+            <input id="margeInput" class="input small" inputmode="decimal" aria-label="Marge en pourcentage" />
+            <div class="hint">Pour simuler une marge commerciale</div>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="grid two">
+          <div>
+            <div class="sectionTitle">Après remise</div>
+            <div class="k" style="font-size:22px" id="afterDiscountK">0 €</div>
+          </div>
+          <div>
+            <div class="sectionTitle">Avec marge</div>
+            <div class="k" style="font-size:22px" id="withMarginK">0 €</div>
+          </div>
+        </div>
+
+        <div style="height:16px"></div>
+        
+      </div>
+    </section>
+  </main>
+
+  <div class="container footer" aria-hidden="true" style="height: 32px;"></div>
+
+  <script type="module">
+    // Utility: formatters
+    const euro = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+    const num = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 });
+
+    // State
+    const defaultPhases = [
+      { id: crypto.randomUUID(), name: "Cadrage fonctionnel", days: 3 },
+      { id: crypto.randomUUID(), name: "UX / Prototype", days: 2 },
+      { id: crypto.randomUUID(), name: "Développement app", days: 10 },
+      { id: crypto.randomUUID(), name: "Intégration IA", days: 5 },
+      { id: crypto.randomUUID(), name: "Tests / Validation", days: 3 },
+      { id: crypto.randomUUID(), name: "Formation / Support", days: 2 }
+    ];
+
+    const state = {
+      phases: structuredClone(defaultPhases),
+      tjm: 800,
+      remisePct: 0,
+      margePct: 0
+    };
+
+    // DOM elements
+    const phasesList = document.getElementById('phasesList');
+    const tjmInput = document.getElementById('tjmInput');
+    const remiseInput = document.getElementById('remiseInput');
+    const margeInput = document.getElementById('margeInput');
+
+    const totalDaysK = document.getElementById('totalDaysK');
+    const totalCostK = document.getElementById('totalCostK');
+    const tableBody = document.getElementById('tableBody');
+    const tfootDays = document.getElementById('tfootDays');
+    const tfootCost = document.getElementById('tfootCost');
+    const afterDiscountK = document.getElementById('afterDiscountK');
+    const withMarginK = document.getElementById('withMarginK');
+
+    const addPhaseBtn = document.getElementById('addPhaseBtn');
+    const presetLeanBtn = document.getElementById('presetLeanBtn');
+    const presetFullBtn = document.getElementById('presetFullBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const printBtn = document.getElementById('printBtn');
+    const quoteHeader = document.getElementById('quoteHeader');
+    const quoteDate = document.getElementById('quoteDate');
+    const quoteRef = document.getElementById('quoteRef');
+
+    // Helpers
+    const clampNumber = (v, min=0, max=1e6) => Math.min(max, Math.max(min, v));
+    const parseNum = (str, fallback=0) => {
+      if (typeof str === 'number') return str;
+      if (!str) return fallback;
+      const s = String(str).replace(/\s/g,'').replace(',', '.');
+      const v = Number(s);
+      return Number.isFinite(v) ? v : fallback;
+    };
+
+    // Render a single phase row
+    function renderPhaseRow(phase, index) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.dataset.id = phase.id;
+
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.innerHTML = `<span class="dot"></span><span class="name">${phase.name}</span>`;
+      row.appendChild(label);
+
+      const right = document.createElement('div');
+      right.style.display = 'flex';
+      right.style.alignItems = 'center';
+      right.style.gap = '8px';
+
+      const input = document.createElement('input');
+      input.className = 'input';
+      input.setAttribute('inputmode','decimal');
+      input.setAttribute('aria-label', `Jours pour ${phase.name}`);
+      input.value = phase.days;
+
+      input.addEventListener('input', () => {
+        const v = clampNumber(parseNum(input.value, 0), 0, 10000);
+        const invalid = !Number.isFinite(v) || v < 0;
+        input.setAttribute('aria-invalid', invalid ? 'true' : 'false');
+      });
+
+      input.addEventListener('change', () => {
+        const v = clampNumber(parseNum(input.value, 0), 0, 10000);
+        input.value = String(v);
+        const i = state.phases.findIndex(p => p.id === phase.id);
+        if (i >= 0) {
+          state.phases[i].days = v;
+          recompute();
+        }
+      });
+
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'btn small ghost';
+      renameBtn.textContent = 'Renommer';
+
+      renameBtn.addEventListener('click', () => {
+        const newName = prompt('Nom de la phase :', phase.name);
+        if (newName && newName.trim()) {
+          const i = state.phases.findIndex(p => p.id === phase.id);
+          if (i >= 0) {
+            state.phases[i].name = newName.trim();
+            renderPhasesList(); // re-render labels
+            recompute();
+          }
+        }
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn small danger';
+      delBtn.textContent = 'Supprimer';
+      delBtn.addEventListener('click', () => {
+        if (confirm(`Supprimer la phase "${phase.name}" ?`)) {
+          state.phases = state.phases.filter(p => p.id !== phase.id);
+          renderPhasesList();
+          recompute();
+        }
+      });
+
+      right.append(input, renameBtn, delBtn);
+      row.appendChild(right);
+      return row;
+    }
+
+    function renderPhasesList() {
+      phasesList.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+
+      // Section title
+      const st = document.createElement('div');
+      st.className = 'sectionTitle';
+      st.textContent = 'Phases';
+      fragment.appendChild(st);
+
+      // Rows
+      state.phases.forEach((p, i) => {
+        fragment.appendChild(renderPhaseRow(p, i));
+      });
+
+      phasesList.appendChild(fragment);
+    }
+
+    function recompute() {
+      const totalDays = state.phases.reduce((a, p) => a + (Number(p.days) || 0), 0);
+      const totalCost = totalDays * (Number(state.tjm) || 0);
+
+      totalDaysK.textContent = `${num.format(totalDays)} j`;
+      totalCostK.textContent = euro.format(totalCost);
+      tfootDays.textContent = num.format(totalDays);
+      tfootCost.textContent = euro.format(totalCost);
+
+      // Table detail
+      tableBody.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      state.phases.forEach(p => {
+        const tr = document.createElement('tr');
+        const tdName = document.createElement('td');
+        const tdDays = document.createElement('td');
+        const tdCost = document.createElement('td');
+        tdName.textContent = p.name;
+        tdDays.textContent = num.format(Number(p.days) || 0);
+        tdCost.textContent = euro.format((Number(p.days) || 0) * (Number(state.tjm) || 0));
+        tr.append(tdName, tdDays, tdCost);
+        frag.appendChild(tr);
+      });
+      tableBody.appendChild(frag);
+
+      // Remise & marge
+      const remise = clampNumber(Number(state.remisePct) || 0, 0, 100);
+      const marge = clampNumber(Number(state.margePct) || 0, 0, 100);
+
+      const afterDiscount = totalCost * (1 - remise / 100);
+      const withMargin = afterDiscount * (1 + marge / 100);
+
+      afterDiscountK.textContent = euro.format(afterDiscount);
+      withMarginK.textContent = euro.format(withMargin);
+    }
+
+    // Init inputs
+    function initControls() {
+      tjmInput.value = String(state.tjm);
+      tjmInput.addEventListener('input', () => {
+        const v = clampNumber(parseNum(tjmInput.value, 0), 0, 100000);
+        const invalid = !Number.isFinite(v) || v < 0;
+        tjmInput.setAttribute('aria-invalid', invalid ? 'true' : 'false');
+      });
+      tjmInput.addEventListener('change', () => {
+        const v = clampNumber(parseNum(tjmInput.value, 0), 0, 100000);
+        tjmInput.value = String(v);
+        state.tjm = v;
+        recompute();
+      });
+
+      remiseInput.value = String(state.remisePct);
+      remiseInput.addEventListener('input', () => {
+        const v = clampNumber(parseNum(remiseInput.value, 0), 0, 100);
+        remiseInput.setAttribute('aria-invalid', (!Number.isFinite(v)) ? 'true' : 'false');
+      });
+      remiseInput.addEventListener('change', () => {
+        const v = clampNumber(parseNum(remiseInput.value, 0), 0, 100);
+        remiseInput.value = String(v);
+        state.remisePct = v;
+        recompute();
+      });
+
+      margeInput.value = String(state.margePct);
+      margeInput.addEventListener('input', () => {
+        const v = clampNumber(parseNum(margeInput.value, 0), 0, 100);
+        margeInput.setAttribute('aria-invalid', (!Number.isFinite(v)) ? 'true' : 'false');
+      });
+      margeInput.addEventListener('change', () => {
+        const v = clampNumber(parseNum(margeInput.value, 0), 0, 100);
+        margeInput.value = String(v);
+        state.margePct = v;
+        recompute();
+      });
+
+      addPhaseBtn.addEventListener('click', () => {
+        const name = prompt('Nom de la nouvelle phase :', 'Nouvelle phase');
+        if (!name || !name.trim()) return;
+        const daysStr = prompt('Nombre de jours (ex: 2):', '1');
+        const days = clampNumber(parseNum(daysStr, 1), 0, 10000);
+        state.phases.push({ id: crypto.randomUUID(), name: name.trim(), days });
+        renderPhasesList();
+        recompute();
+      });
+
+      presetLeanBtn.addEventListener('click', () => {
+        state.phases = [
+          { id: crypto.randomUUID(), name: "Cadrage express", days: 1 },
+          { id: crypto.randomUUID(), name: "Prototype rapide", days: 1 },
+          { id: crypto.randomUUID(), name: "Dev noyau", days: 5 },
+          { id: crypto.randomUUID(), name: "Tests essentiels", days: 1 }
+        ];
+        renderPhasesList();
+        recompute();
+      });
+
+      presetFullBtn.addEventListener('click', () => {
+        state.phases = [
+          { id: crypto.randomUUID(), name: "Cadrage fonctionnel", days: 4 },
+          { id: crypto.randomUUID(), name: "UX / Recherche", days: 3 },
+          { id: crypto.randomUUID(), name: "Prototype haute fidélité", days: 3 },
+          { id: crypto.randomUUID(), name: "Développement app", days: 12 },
+          { id: crypto.randomUUID(), name: "Intégration IA", days: 7 },
+          { id: crypto.randomUUID(), name: "Sécurité & Observabilité", days: 3 },
+          { id: crypto.randomUUID(), name: "Tests / Validation", days: 4 },
+          { id: crypto.randomUUID(), name: "Formation / Support", days: 3 }
+        ];
+        renderPhasesList();
+        recompute();
+      });
+
+      resetBtn.addEventListener('click', () => {
+        if (!confirm('Réinitialiser aux valeurs par défaut ?')) return;
+        state.phases = structuredClone(defaultPhases);
+        state.tjm = 800;
+        state.remisePct = 0;
+        state.margePct = 0;
+        renderPhasesList();
+        initControls(); // resets input values
+        recompute();
+      });
+
+      exportBtn.addEventListener('click', () => {
+        // JSON export (unchanged)
+        const totalDays = state.phases.reduce((a, p) => a + (Number(p.days) || 0), 0);
+        const totalCost = totalDays * (Number(state.tjm) || 0);
+        const remise = clampNumber(Number(state.remisePct) || 0, 0, 100);
+        const marge = clampNumber(Number(state.margePct) || 0, 0, 100);
+        const afterDiscount = totalCost * (1 - remise / 100);
+        const withMargin = afterDiscount * (1 + marge / 100);
+
+        const payload = {
+          generatedAt: new Date().toISOString(),
+          tjm: state.tjm,
+          phases: state.phases.map(p => ({ name: p.name, days: Number(p.days) || 0 })),
+          totals: {
+            days: totalDays,
+            costHT: totalCost,
+            remisePct: remise,
+            afterRemiseHT: afterDiscount,
+            margePct: marge,
+            totalWithMargeHT: withMargin
+          }
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.download = `simulation-cadrage-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;
+        a.href = url;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+      });
+
+      // Print/PDF export using native print (A4)
+      if (printBtn) {
+        printBtn.addEventListener('click', () => {
+          // Prepare dynamic meta for the quote header
+          const now = new Date();
+          const iso = now.toISOString();
+          const ref = `DEV-${iso.slice(0,19).replace(/[:T]/g,'')}`;
+          if (quoteHeader) {
+            quoteHeader.style.display = 'grid';
+            if (quoteDate) quoteDate.textContent = `Date: ${now.toLocaleDateString('fr-FR')} ${now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+            if (quoteRef) quoteRef.textContent = `Réf: ${ref}`;
+          }
+
+          // Ensure computed values are fresh
+          recompute();
+
+          // Small timeout to ensure DOM updated before print
+          setTimeout(() => {
+            window.print();
+            // Cleanup after print (in case user cancels)
+            if (quoteHeader) {
+              setTimeout(() => { quoteHeader.style.display = 'none'; }, 0);
+            }
+          }, 50);
+        });
+      }
+    }
+
+    // Initial render
+    renderPhasesList();
+    initControls();
+    recompute();
+
+    // Notes on inspiration and improvements:
+    // - We moved from React/shadcn components to vanilla, preserving UX patterns similar
+    //   to card, button, input layouts popular in tutorials and dashboards
+    //   such as those showcased on dev.to and Medium articles:
+    //   [dev.to](https://dev.to/vyan/building-a-secure-employee-dashboard-with-facial-authentication-a-comprehensive-nextjs-tutorial-2c4g)
+    //   [medium.com](https://asharibali.medium.com/building-a-simple-calculator-app-with-next-js-20d4dcbfa6a8)
+    //   [medium.com](https://medium.com/api-dev-tips/basic-store-with-stripe-api-c07b6cdf041d)
+    //   [webrevamp.substack.com](https://webrevamp.substack.com/p/building-a-todo-application-with?utm_campaign=post&utm_medium=web)
+    // - Enhancements: presets, add/rename/delete phases, discounts and margin, totals table,
+    //   JSON export, accessible labels, keyboard-friendly numeric inputs, optimistic validation.
+  </script>
+</body>
+</html>
